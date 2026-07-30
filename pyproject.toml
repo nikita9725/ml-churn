@@ -5,6 +5,7 @@ description = "ML service for customer churn prediction"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.141.1",
+    "pydantic>=2.0.0",
     "uvicorn>=0.52.0",
 ]
 
