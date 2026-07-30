@@ -1,0 +1,6 @@
+monthly_fee,usage_hours,support_requests,account_age_months,failed_payments,region,device_type,payment_method,autopay_enabled,churn
+65.5,120.0,3,24,1,EU,mobile,credit_card,1,1
+45.0,80.0,1,36,0,US,laptop,paypal,0,0
+80.0,200.0,5,12,3,EU,mobile,credit_card,1,1
+30.0,50.0,0,48,0,US,tablet,bank_transfer,1,0
+55.0,100.0,2,18,1,EU,mobile,credit_card,0,1
