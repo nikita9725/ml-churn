@@ -17,6 +17,10 @@ class DatasetRepository:
         self._file_path = Path(file_path)
         self._df = pd.read_csv(self._file_path)
 
+    @property
+    def df(self) -> pd.DataFrame:
+        return self._df
+
     def get_preview(self, n: int = 10) -> list[dict]:
         return self._df.head(n).to_dict(orient="records")
 
