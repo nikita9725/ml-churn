@@ -18,10 +18,13 @@ test:
 lint:
 	uv run ruff check src/ tests/
 
+typecheck:
+	uv run mypy src/ tests/
+
 format:
 	uv run ruff format src/ tests/
 
-check: lint test
+check: lint typecheck test
 
 docker-build:
 	docker compose build

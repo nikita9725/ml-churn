@@ -4,3 +4,8 @@ repos:
     hooks:
       - id: ruff
       - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [pandas-stubs]
