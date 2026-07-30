@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 import pandas as pd
-from sklearn.model_selection import train_test_split  # type: ignore[import-untyped]
+from sklearn.model_selection import train_test_split
 
 TARGET_COLUMN = "churn"
 

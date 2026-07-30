@@ -1,15 +1,15 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
 from src.dataset.preprocessing import check_class_distribution, prepare_data, split_data
 from src.dataset.repository import DatasetRepository
+from src.model.training import train_churn_model
 
 app = FastAPI()
 
 _dataset_path = Path(__file__).resolve().parent.parent / "data" / "churn_dataset.csv"
-dataset_repo = DatasetRepository(_dataset_path)
 
 
 class FeatureVectorChurn(BaseModel):
@@ -53,6 +53,15 @@ class SplitInfoResponse(BaseModel):
     test_distribution: ClassDistributionResponse
 
 
+class ModelMetricsResponse(BaseModel):
+    accuracy: float
+    f1: float
+
+
+def get_dataset_repo() -> DatasetRepository:
+    return DatasetRepository(_dataset_path)
+
+
 @app.get("/", response_model=HealthResponse)
 async def root() -> HealthResponse:
     return HealthResponse(message="ml churn service is running")
@@ -64,14 +73,18 @@ async def predict(features: FeatureVectorChurn) -> FeatureVectorChurn:
 
 
 @app.get("/dataset/preview", response_model=list[DatasetRowChurn])
-async def dataset_preview(n: int = 10) -> list[DatasetRowChurn]:
-    rows = dataset_repo.get_preview(n)
+async def dataset_preview(
+    n: int = 10, repo: DatasetRepository = Depends(get_dataset_repo)
+) -> list[DatasetRowChurn]:
+    rows = repo.get_preview(n)
     return [DatasetRowChurn(**row) for row in rows]
 
 
 @app.get("/dataset/info", response_model=DatasetInfoResponse)
-async def dataset_info() -> DatasetInfoResponse:
-    info = dataset_repo.get_info()
+async def dataset_info(
+    repo: DatasetRepository = Depends(get_dataset_repo),
+) -> DatasetInfoResponse:
+    info = repo.get_info()
     return DatasetInfoResponse(
         row_count=info.row_count,
         column_count=info.column_count,
@@ -81,8 +94,10 @@ async def dataset_info() -> DatasetInfoResponse:
 
 
 @app.get("/dataset/split-info", response_model=SplitInfoResponse)
-async def dataset_split_info() -> SplitInfoResponse:
-    df = dataset_repo.df
+async def dataset_split_info(
+    repo: DatasetRepository = Depends(get_dataset_repo),
+) -> SplitInfoResponse:
+    df = repo.df
     prepared = prepare_data(df)
     split = split_data(prepared)
     distribution = check_class_distribution(split.y_train, split.y_test)
@@ -105,4 +120,35 @@ async def dataset_split_info() -> SplitInfoResponse:
             ratio_0=distribution.test.get(0, 0.0),
             ratio_1=distribution.test.get(1, 0.0),
         ),
+    )
+
+
+@app.post("/model/train")
+async def model_train(
+    repo: DatasetRepository = Depends(get_dataset_repo),
+) -> ModelMetricsResponse:
+    """
+    Запускает обучение модели на данных из churn_dataset.csv.
+
+    Эндпоинт:
+    1. Загружает данные из репозитория
+    2. Проверяет что данные не пустые
+    3. Обучает модель через train_churn_model
+    4. Возвращает метрики accuracy и f1 на тестовой выборке
+    """
+    df = repo.df
+
+    if df.empty:
+        raise HTTPException(status_code=400, detail="Dataset is empty")
+
+    try:
+        _, metrics = train_churn_model(df)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Model training failed: {e!s}"
+        ) from e
+
+    return ModelMetricsResponse(
+        accuracy=metrics.accuracy,
+        f1=metrics.f1,
     )
