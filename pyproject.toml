@@ -29,5 +29,5 @@ testpaths = ["tests"]
 ignore = ["B008"]
 
 [[tool.mypy.overrides]]
-module = "sklearn.*"
+module = ["joblib.*", "sklearn.*"]
 ignore_missing_imports = true
