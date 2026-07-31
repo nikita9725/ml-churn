@@ -1,15 +1,37 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.dataset.preprocessing import check_class_distribution, prepare_data, split_data
 from src.dataset.repository import DatasetRepository
+from src.model.repository import ModelNotTrainedError, ModelRepository
 from src.model.training import train_churn_model
 
-app = FastAPI()
-
 _dataset_path = Path(__file__).resolve().parent.parent / "data" / "churn_dataset.csv"
+_model_path = Path(__file__).resolve().parent.parent / "models" / "churn_model.joblib"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    repo = ModelRepository(_model_path)
+    repo.load()
+    app.state.model_repo = repo
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(ModelNotTrainedError)
+async def model_not_trained_handler(
+    request: Request, exc: ModelNotTrainedError
+) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 class FeatureVectorChurn(BaseModel):
@@ -58,8 +80,19 @@ class ModelMetricsResponse(BaseModel):
     f1: float
 
 
+class ModelStatusResponse(BaseModel):
+    is_trained: bool
+    trained_at: datetime | None
+    accuracy: float | None
+    f1: float | None
+
+
 def get_dataset_repo() -> DatasetRepository:
     return DatasetRepository(_dataset_path)
+
+
+def get_loaded_model_repo() -> ModelRepository:
+    return app.state.model_repo
 
 
 @app.get("/", response_model=HealthResponse)
@@ -126,6 +159,7 @@ async def dataset_split_info(
 @app.post("/model/train")
 async def model_train(
     repo: DatasetRepository = Depends(get_dataset_repo),
+    model_repo: ModelRepository = Depends(get_loaded_model_repo),
 ) -> ModelMetricsResponse:
     """
     Запускает обучение модели на данных из churn_dataset.csv.
@@ -134,7 +168,8 @@ async def model_train(
     1. Загружает данные из репозитория
     2. Проверяет что данные не пустые
     3. Обучает модель через train_churn_model
-    4. Возвращает метрики accuracy и f1 на тестовой выборке
+    4. Сохраняет модель на диск
+    5. Возвращает метрики accuracy и f1 на тестовой выборке
     """
     df = repo.df
 
@@ -142,7 +177,8 @@ async def model_train(
         raise HTTPException(status_code=400, detail="Dataset is empty")
 
     try:
-        _, metrics = train_churn_model(df)
+        pipeline, metrics = train_churn_model(df)
+        model_repo.save(pipeline, metrics)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Model training failed: {e!s}"
@@ -151,4 +187,16 @@ async def model_train(
     return ModelMetricsResponse(
         accuracy=metrics.accuracy,
         f1=metrics.f1,
+    )
+
+
+@app.get("/model/status", response_model=ModelStatusResponse)
+async def model_status(
+    model_repo: ModelRepository = Depends(get_loaded_model_repo),
+) -> ModelStatusResponse:
+    return ModelStatusResponse(
+        is_trained=model_repo.is_trained,
+        trained_at=model_repo.trained_at,
+        accuracy=model_repo.metrics.accuracy if model_repo.metrics else None,
+        f1=model_repo.metrics.f1 if model_repo.metrics else None,
     )

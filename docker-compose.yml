@@ -3,3 +3,8 @@ services:
     build: .
     ports:
       - "8000:8000"
+    volumes:
+      - model_data:/app/models
+
+volumes:
+  model_data:
