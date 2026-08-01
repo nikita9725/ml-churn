@@ -6,8 +6,9 @@ import pytest
 from fastapi import Depends
 from fastapi.testclient import TestClient
 
+from src.api.dependencies import get_loaded_model_repo
 from src.dataset.repository import DatasetRepository
-from src.main import app, get_dataset_repo, get_loaded_model_repo
+from src.main import app
 from src.model.repository import ModelNotTrainedError, ModelRepository
 from src.model.training import ModelMetrics, train_churn_model
 
@@ -17,20 +18,6 @@ REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
 @pytest.fixture
 def sample_df() -> pd.DataFrame:
     return pd.read_csv(REAL_DATA_PATH)
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
-
-
-@pytest.fixture
-def override_repo() -> Generator[Callable[[DatasetRepository | object], None]]:
-    def _override(repo: DatasetRepository | object) -> None:
-        app.dependency_overrides[get_dataset_repo] = lambda: repo
-
-    yield _override
-    app.dependency_overrides.clear()
 
 
 def test_train_churn_model_returns_pipeline_and_metrics(
