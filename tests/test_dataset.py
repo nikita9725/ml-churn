@@ -5,6 +5,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api.dependencies import get_dataset_repo
 from src.dataset.preprocessing import (
     TARGET_COLUMN,
     check_class_distribution,
@@ -12,7 +13,7 @@ from src.dataset.preprocessing import (
     split_data,
 )
 from src.dataset.repository import DatasetRepository
-from src.main import app, get_dataset_repo
+from src.main import app
 
 REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
 
@@ -20,11 +21,6 @@ REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
 @pytest.fixture
 def repo() -> DatasetRepository:
     return DatasetRepository(REAL_DATA_PATH)
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
 
 
 @pytest.fixture
