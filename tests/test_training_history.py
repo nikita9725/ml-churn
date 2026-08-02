@@ -149,6 +149,75 @@ class TestJsonTrainingHistoryRepository:
         assert len(loaded.get_all(model_type="logreg")) == 1
         assert len(loaded.get_all(model_type="random_forest")) == 1
 
+    def test_get_last_after_reload(self, tmp_path: Path) -> None:
+        path = tmp_path / "history.json"
+        repo = JsonTrainingHistoryRepository(path)
+        entries = [
+            _make_entry(
+                accuracy=0.1 * i,
+                timestamp=datetime(2026, 1, i, 12, 0, 0, tzinfo=UTC),
+            )
+            for i in range(1, 6)
+        ]
+        for e in entries:
+            repo.add(e)
+
+        loaded = JsonTrainingHistoryRepository(path)
+        loaded.load()
+        last_2 = loaded.get_last(2)
+        assert len(last_2) == 2
+        assert last_2[0].accuracy == 0.4
+        assert last_2[1].accuracy == 0.5
+
+    def test_save_creates_parent_directories(self, tmp_path: Path) -> None:
+        path = tmp_path / "nested" / "dir" / "history.json"
+        repo = JsonTrainingHistoryRepository(path)
+        repo.add(_make_entry())
+
+        assert path.exists()
+        data = json.loads(path.read_text())
+        assert len(data) == 1
+
+    def test_multiple_adds_persist_all(self, tmp_path: Path) -> None:
+        path = tmp_path / "history.json"
+        repo = JsonTrainingHistoryRepository(path)
+
+        for i in range(5):
+            repo.add(_make_entry(accuracy=0.1 * (i + 1)))
+
+        loaded = JsonTrainingHistoryRepository(path)
+        loaded.load()
+        entries = loaded.get_all()
+        assert len(entries) == 5
+        assert [e.accuracy for e in entries] == pytest.approx([0.1, 0.2, 0.3, 0.4, 0.5])
+
+    def test_timestamp_preserved_after_roundtrip(self, tmp_path: Path) -> None:
+        path = tmp_path / "history.json"
+        repo = JsonTrainingHistoryRepository(path)
+        ts = datetime(2026, 6, 15, 14, 30, 45, tzinfo=UTC)
+        repo.add(_make_entry(timestamp=ts))
+
+        loaded = JsonTrainingHistoryRepository(path)
+        loaded.load()
+        entries = loaded.get_all()
+        assert len(entries) == 1
+        assert entries[0].timestamp == ts
+
+    def test_hyperparameters_with_nested_structures(self, tmp_path: Path) -> None:
+        path = tmp_path / "history.json"
+        repo = JsonTrainingHistoryRepository(path)
+        hyperparams = {
+            "n_estimators": 200,
+            "max_depth": 10,
+            "sub_params": {"key": "value", "list": [1, 2, 3]},
+        }
+        repo.add(_make_entry(hyperparameters=hyperparams))
+
+        loaded = JsonTrainingHistoryRepository(path)
+        loaded.load()
+        entries = loaded.get_all()
+        assert entries[0].hyperparameters == hyperparams
+
 
 # ── Endpoint: POST /model/train saves history ────────────────────────
 

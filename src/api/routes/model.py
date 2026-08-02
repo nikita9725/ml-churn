@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, Query
@@ -22,6 +23,8 @@ from src.schemas import (
     TrainingConfigChurn,
     TrainingHistoryEntryResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/model", tags=["model"])
 
@@ -49,11 +52,23 @@ def model_train(
     if df.empty:
         raise EmptyDatasetError()
 
+    logger.info(
+        "Starting model training (type=%s, rows=%d)", config.model_type, len(df)
+    )
+
     try:
         pipeline, metrics, config = train_churn_model(df, config)
         model_repo.save(pipeline, metrics, config)
     except Exception as e:
+        logger.error("Model training failed: %s", e)
         raise TrainingFailedError(str(e)) from e
+
+    logger.info(
+        "Training complete — accuracy=%.4f, f1=%.4f, roc_auc=%.4f",
+        metrics.accuracy,
+        metrics.f1,
+        metrics.roc_auc,
+    )
 
     history_repo.add(
         TrainingHistoryEntry(

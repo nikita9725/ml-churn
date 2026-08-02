@@ -1,7 +1,10 @@
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -15,7 +18,11 @@ class DatasetInfo:
 class DatasetRepository:
     def __init__(self, file_path: str | Path) -> None:
         self._file_path = Path(file_path)
+        logger.info("Loading dataset from %s", self._file_path)
         self._df = pd.read_csv(self._file_path)
+        logger.info(
+            "Dataset loaded: %d rows, %d columns", len(self._df), len(self._df.columns)
+        )
 
     @property
     def df(self) -> pd.DataFrame:

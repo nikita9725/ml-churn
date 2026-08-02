@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 from fastapi import APIRouter, Depends
 
@@ -6,6 +8,8 @@ from src.dataset.preprocessing import CATEGORICAL_COLUMNS, NUMERIC_COLUMNS
 from src.exceptions import PredictionFailedError
 from src.model.repository import ModelRepository
 from src.schemas import FeatureVectorChurn, PredictionResponseChurn
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["predict"])
 
@@ -62,6 +66,8 @@ def predict(
         features_list = features
         is_single = False
 
+    logger.info("Prediction request for %d client(s)", len(features_list))
+
     df = pd.DataFrame(
         [f.model_dump() for f in features_list], columns=ALL_FEATURE_COLUMNS
     )
@@ -70,6 +76,7 @@ def predict(
         predictions = pipeline.predict(df)
         probabilities = pipeline.predict_proba(df)
     except Exception as e:
+        logger.error("Prediction failed: %s", e)
         raise PredictionFailedError(str(e)) from e
 
     results = [

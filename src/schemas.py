@@ -24,6 +24,12 @@ class HealthResponse(BaseModel):
     message: str
 
 
+class HealthCheckResponse(BaseModel):
+    status: str
+    model_available: bool
+    dataset_loaded: bool
+
+
 class DatasetInfoResponse(BaseModel):
     row_count: int
     column_count: int
