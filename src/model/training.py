@@ -1,10 +1,12 @@
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -21,6 +23,17 @@ from src.schemas import TrainingConfigChurn
 class ModelMetrics:
     accuracy: float
     f1: float
+    roc_auc: float
+
+
+@dataclass
+class TrainingHistoryEntry:
+    timestamp: datetime
+    model_type: str
+    hyperparameters: dict[str, Any]
+    accuracy: float
+    f1: float
+    roc_auc: float
 
 
 def _build_preprocessor() -> ColumnTransformer:
@@ -126,10 +139,12 @@ def train_churn_model(
     pipeline.fit(split.X_train, split.y_train)
 
     y_pred = pipeline.predict(split.X_test)
+    y_prob = pipeline.predict_proba(split.X_test)[:, 1]
 
     metrics = ModelMetrics(
         accuracy=accuracy_score(split.y_test, y_pred),
         f1=f1_score(split.y_test, y_pred),
+        roc_auc=roc_auc_score(split.y_test, y_prob),
     )
 
     return pipeline, metrics, config

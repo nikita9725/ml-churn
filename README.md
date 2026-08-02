@@ -67,8 +67,11 @@ ML-сервис для прогнозирования оттока клиент�
 |---------|----------|
 | **Accuracy** | Доля правильных предсказаний среди всех |
 | **F1-score** | Гармоническое среднее precision и recall |
+| **ROC-AUC** | Площадь под ROC-кривой, качество разделения классов |
 
 > **Почему F1 важен?** Датасет несбалансирован (~80% остались, ~20% ушли). Accuracy может вводить в заблуждение — модель может просто предсказывать "не уйдёт" и получить 80%, но не ловить реальных churn-клиентов.
+
+> **Зачем ROC-AUC?** Показывает, насколько хорошо модель разделяет классы до выбора порога. Полезно для сравнения моделей между собой.
 
 ## 🚀 Быстрый старт
 
@@ -82,7 +85,8 @@ curl -X POST http://127.0.0.1:8000/model/train
 ```json
 {
   "accuracy": 0.79,
-  "f1": 0.04
+  "f1": 0.04,
+  "roc_auc": 0.61
 }
 ```
 
@@ -101,7 +105,8 @@ curl -X POST http://127.0.0.1:8000/model/train \
 ```json
 {
   "accuracy": 0.79,
-  "f1": 0.17
+  "f1": 0.17,
+  "roc_auc": 0.59
 }
 ```
 
@@ -118,10 +123,58 @@ curl http://127.0.0.1:8000/model/status
   "trained_at": "2026-08-02T07:59:52.699997Z",
   "accuracy": 0.79,
   "f1": 0.17,
+  "roc_auc": 0.59,
   "model_type": "random_forest",
   "hyperparameters": {"n_estimators": 100}
 }
 ```
+
+### История обучений и метрики
+
+```bash
+# Все записи истории
+curl http://127.0.0.1:8000/model/metrics
+
+# Фильтрация по типу модели
+curl "http://127.0.0.1:8000/model/metrics?model_type=logreg"
+
+# Ограничить количество записей
+curl "http://127.0.0.1:8000/model/metrics?limit=5"
+```
+
+**Ответ:**
+```json
+{
+  "latest": {
+    "timestamp": "2026-08-02T09:40:02.526865Z",
+    "model_type": "random_forest",
+    "hyperparameters": {"n_estimators": 50},
+    "accuracy": 0.78,
+    "f1": 0.14,
+    "roc_auc": 0.57
+  },
+  "history": [
+    {
+      "timestamp": "2026-08-02T09:40:01.393021Z",
+      "model_type": "logreg",
+      "hyperparameters": {},
+      "accuracy": 0.79,
+      "f1": 0.04,
+      "roc_auc": 0.61
+    },
+    {
+      "timestamp": "2026-08-02T09:40:02.526865Z",
+      "model_type": "random_forest",
+      "hyperparameters": {"n_estimators": 50},
+      "accuracy": 0.78,
+      "f1": 0.14,
+      "roc_auc": 0.57
+    }
+  ]
+}
+```
+
+> **Как это работает:** При каждом `/model/train` создаётся запись в истории обучений (сохраняется в `models/training_history.json`). Эндпоинт `/model/metrics` позволяет сравнивать результаты разных обучений и фильтровать по типу модели.
 
 ### Предсказание для нового клиента
 
@@ -193,6 +246,7 @@ curl http://127.0.0.1:8000/model/schema
 |-------|------|----------|
 | POST | `/model/train` | Обучение модели с конфигурацией |
 | GET | `/model/status` | Статус модели (тип, метрики, гиперпараметры) |
+| GET | `/model/metrics` | История обучений и метрики (фильтрация по `model_type`, `limit`) |
 | GET | `/model/schema` | Схема признаков модели (название, тип, описание) |
 
 ### Предсказания
@@ -278,17 +332,18 @@ src/
 ├── main.py                    # FastAPI приложение, lifespan, exception handler
 ├── schemas.py                 # Pydantic модели (схемы)
 ├── api/
-│   ├── dependencies.py        # Dependency injection (get_dataset_repo, get_loaded_model_repo)
+│   ├── dependencies.py        # Dependency injection (get_dataset_repo, get_loaded_model_repo, get_training_history_repo)
 │   └── routes/
 │       ├── dataset.py         # Эндпоинты для работы с датасетом
-│       ├── model.py           # Эндпоинты для обучения и статуса модели
+│       ├── model.py           # Эндпоинты для обучения, статуса и метрик модели
 │       └── predict.py         # Эндпоинт для предсказаний
 ├── dataset/
 │   ├── preprocessing.py       # Предобработка данных, train/test split
 │   └── repository.py          # Загрузка и хранение датасета
 └── model/
-    ├── training.py            # ML pipeline, обучение модели
-    └── repository.py          # Сохранение и загрузка модели
+    ├── training.py            # ML pipeline, обучение модели, ModelMetrics, TrainingHistoryEntry
+    ├── repository.py          # Сохранение и загрузка модели
+    └── history_repository.py  # История обучений (абстрактный репозиторий, InMemory, JSON)
 
 tests/
 ├── conftest.py                # Общие fixtures
@@ -296,10 +351,12 @@ tests/
 ├── test_main.py               # Тесты root endpoint
 ├── test_dataset.py            # Тесты dataset (unit + API)
 ├── test_model.py              # Тесты model (unit + API)
-└── test_predict.py            # Тесты predict (API)
+├── test_predict.py            # Тесты predict (API)
+└── test_training_history.py   # Тесты истории обучений (unit + API)
 
-models/                        # Сохранённые модели (gitignored)
-└── churn_model.joblib         # Обученная модель с конфигом
+models/                        # Сохранённые модели и история (gitignored)
+├── churn_model.joblib         # Обученная модель с конфигом
+└── training_history.json      # История обучений
 
 data/
 └── churn_dataset.csv          # Датасет (2000 записей)

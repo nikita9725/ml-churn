@@ -35,6 +35,7 @@ def test_train_churn_model_metrics_are_valid(sample_df: pd.DataFrame) -> None:
     _, metrics, _ = train_churn_model(sample_df)
     assert 0.0 <= metrics.accuracy <= 1.0
     assert 0.0 <= metrics.f1 <= 1.0
+    assert 0.0 <= metrics.roc_auc <= 1.0
 
 
 def test_train_churn_model_pipeline_can_predict(sample_df: pd.DataFrame) -> None:
@@ -58,8 +59,10 @@ def test_model_train_endpoint(
     data = response.json()
     assert "accuracy" in data
     assert "f1" in data
+    assert "roc_auc" in data
     assert 0.0 <= data["accuracy"] <= 1.0
     assert 0.0 <= data["f1"] <= 1.0
+    assert 0.0 <= data["roc_auc"] <= 1.0
 
 
 def test_model_train_endpoint_empty_dataset(
@@ -108,6 +111,7 @@ def test_save_and_load_model(sample_df: pd.DataFrame, model_path: Path) -> None:
     assert loaded_repo.metrics is not None
     assert loaded_repo.metrics.accuracy == metrics.accuracy
     assert loaded_repo.metrics.f1 == metrics.f1
+    assert loaded_repo.metrics.roc_auc == metrics.roc_auc
     assert loaded_repo.trained_at is not None
     assert loaded_repo.config is not None
     assert loaded_repo.config.model_type == config.model_type
@@ -157,6 +161,7 @@ def test_model_status_after_train(
     assert data["is_trained"] is True
     assert data["accuracy"] is not None
     assert data["f1"] is not None
+    assert data["roc_auc"] is not None
     assert data["trained_at"] is not None
 
 
@@ -174,6 +179,7 @@ def test_model_persists_after_restart(
     assert new_repo.metrics is not None
     assert new_repo.metrics.accuracy == metrics.accuracy
     assert new_repo.metrics.f1 == metrics.f1
+    assert new_repo.metrics.roc_auc == metrics.roc_auc
     assert new_repo.config is not None
     assert new_repo.config.model_type == config.model_type
 
