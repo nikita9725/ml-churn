@@ -48,6 +48,7 @@ class SplitInfoResponse(BaseModel):
 class ModelMetricsResponse(BaseModel):
     accuracy: float
     f1: float
+    roc_auc: float
 
 
 class ModelStatusResponse(BaseModel):
@@ -55,8 +56,23 @@ class ModelStatusResponse(BaseModel):
     trained_at: datetime | None
     accuracy: float | None
     f1: float | None
+    roc_auc: float | None = None
     model_type: str | None = None
     hyperparameters: dict[str, Any] | None = None
+
+
+class TrainingHistoryEntryResponse(BaseModel):
+    timestamp: datetime
+    model_type: str
+    hyperparameters: dict[str, Any]
+    accuracy: float
+    f1: float
+    roc_auc: float
+
+
+class ModelMetricsHistoryResponse(BaseModel):
+    latest: TrainingHistoryEntryResponse | None
+    history: list[TrainingHistoryEntryResponse]
 
 
 class PredictionResponseChurn(BaseModel):
