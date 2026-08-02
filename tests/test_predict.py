@@ -81,3 +81,25 @@ def test_predict_list(
         assert item["prediction"] in [0, 1]
         assert 0.0 <= item["probability_churn_0"] <= 1.0
         assert 0.0 <= item["probability_churn_1"] <= 1.0
+
+
+def test_model_schema_endpoint(client: TestClient) -> None:
+    response = client.get("/model/schema")
+    assert response.status_code == 200
+    data = response.json()
+    assert "features" in data
+    features = data["features"]
+    assert len(features) == 9  # 6 numeric + 3 categorical
+
+    # Проверяем, что все признаки имеют name, type и description
+    for feature in features:
+        assert "name" in feature
+        assert "type" in feature
+        assert "description" in feature
+        assert feature["type"] in ["numeric", "categorical"]
+
+    # Проверяем, что есть числовые и категориальные признаки
+    numeric_features = [f for f in features if f["type"] == "numeric"]
+    categorical_features = [f for f in features if f["type"] == "categorical"]
+    assert len(numeric_features) == 6
+    assert len(categorical_features) == 3

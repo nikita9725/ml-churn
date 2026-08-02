@@ -2,10 +2,14 @@ import pandas as pd
 from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_loaded_model_repo
+from src.dataset.preprocessing import CATEGORICAL_COLUMNS, NUMERIC_COLUMNS
 from src.model.repository import ModelRepository
 from src.schemas import FeatureVectorChurn, PredictionResponseChurn
 
 router = APIRouter(tags=["predict"])
+
+# Все признаки в порядке, который использовался при обучении
+ALL_FEATURE_COLUMNS = NUMERIC_COLUMNS + CATEGORICAL_COLUMNS
 
 
 @router.post("/predict")
@@ -57,7 +61,9 @@ def predict(
         features_list = features
         is_single = False
 
-    df = pd.DataFrame([f.model_dump() for f in features_list])
+    df = pd.DataFrame(
+        [f.model_dump() for f in features_list], columns=ALL_FEATURE_COLUMNS
+    )
 
     predictions = pipeline.predict(df)
     probabilities = pipeline.predict_proba(df)

@@ -86,3 +86,13 @@ class TrainingConfigChurn(BaseModel):
                 f"Invalid model_type '{self.model_type}'. Must be one of: {valid_types}"
             )
         return self
+
+
+class FeatureInfo(BaseModel):
+    name: str = Field(description="Название признака")
+    type: str = Field(description="Тип данных: numeric или categorical")
+    description: str = Field(description="Описание признака")
+
+
+class ModelSchemaResponse(BaseModel):
+    features: list[FeatureInfo] = Field(description="Список признаков модели")
