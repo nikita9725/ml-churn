@@ -7,6 +7,7 @@ import joblib
 from sklearn.pipeline import Pipeline
 
 from src.model.training import ModelMetrics
+from src.schemas import TrainingConfigChurn
 
 
 class ModelNotTrainedError(Exception):
@@ -19,21 +20,31 @@ class ModelRepository:
         self._pipeline: Pipeline | None = None
         self._metrics: ModelMetrics | None = None
         self._trained_at: datetime | None = None
+        self._config: TrainingConfigChurn | None = None
 
-    def save(self, pipeline: Pipeline, metrics: ModelMetrics) -> None:
+    def save(
+        self, pipeline: Pipeline, metrics: ModelMetrics, config: TrainingConfigChurn
+    ) -> None:
         self._pipeline = pipeline
         self._metrics = metrics
+        self._config = config
         self._trained_at = datetime.now(UTC)
         self._model_path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(
-            (self._pipeline, self._metrics, self._trained_at),
+            (self._pipeline, self._metrics, self._trained_at, self._config),
             self._model_path,
         )
 
     def load(self) -> None:
         if not self._model_path.exists():
             return
-        self._pipeline, self._metrics, self._trained_at = joblib.load(self._model_path)
+        loaded = joblib.load(self._model_path)
+        # Обратная совместимость: если файл содержит tuple из 3 элементов, используем дефолтный config
+        if len(loaded) == 3:
+            self._pipeline, self._metrics, self._trained_at = loaded
+            self._config = TrainingConfigChurn()  # Дефолтный config
+        else:
+            self._pipeline, self._metrics, self._trained_at, self._config = loaded
 
     @property
     def is_trained(self) -> bool:
@@ -52,3 +63,7 @@ class ModelRepository:
     @property
     def trained_at(self) -> datetime | None:
         return self._trained_at
+
+    @property
+    def config(self) -> TrainingConfigChurn | None:
+        return self._config
