@@ -151,6 +151,31 @@ curl -X POST http://127.0.0.1:8000/predict \
 }
 ```
 
+### Получение схемы признаков
+
+```bash
+curl http://127.0.0.1:8000/model/schema
+```
+
+**Ответ:**
+```json
+{
+  "features": [
+    {"name": "monthly_fee", "type": "numeric", "description": "Ежемесячная плата за сервис"},
+    {"name": "usage_hours", "type": "numeric", "description": "Часы использования сервиса"},
+    {"name": "support_requests", "type": "numeric", "description": "Количество обращений в поддержку"},
+    {"name": "account_age_months", "type": "numeric", "description": "Возраст аккаунта в месяцах"},
+    {"name": "failed_payments", "type": "numeric", "description": "Количество неудачных платежей"},
+    {"name": "autopay_enabled", "type": "numeric", "description": "Включён ли автоплатёж (0/1)"},
+    {"name": "region", "type": "categorical", "description": "Регион клиента (america, europe, asia, africa)"},
+    {"name": "device_type", "type": "categorical", "description": "Тип устройства (mobile, desktop, tablet)"},
+    {"name": "payment_method", "type": "categorical", "description": "Метод оплаты (card, paypal, crypto)"}
+  ]
+}
+```
+
+> **Зачем нужен `/model/schema`?** Клиенты могут получить список признаков, их типы и описания, чтобы правильно формировать запросы к `/predict`.
+
 ### Как это работает
 
 1. Загружаются данные из `data/churn_dataset.csv`
@@ -168,6 +193,7 @@ curl -X POST http://127.0.0.1:8000/predict \
 |-------|------|----------|
 | POST | `/model/train` | Обучение модели с конфигурацией |
 | GET | `/model/status` | Статус модели (тип, метрики, гиперпараметры) |
+| GET | `/model/schema` | Схема признаков модели (название, тип, описание) |
 
 ### Предсказания
 

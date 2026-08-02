@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from src.api.dependencies import get_dataset_repo, get_loaded_model_repo
+from src.dataset.preprocessing import CATEGORICAL_COLUMNS, NUMERIC_COLUMNS
 from src.dataset.repository import DatasetRepository
 from src.model.repository import ModelRepository
 from src.model.training import train_churn_model
-from src.schemas import ModelMetricsResponse, ModelStatusResponse, TrainingConfigChurn
+from src.schemas import (
+    FeatureInfo,
+    ModelMetricsResponse,
+    ModelSchemaResponse,
+    ModelStatusResponse,
+    TrainingConfigChurn,
+)
 
 router = APIRouter(prefix="/model", tags=["model"])
 
@@ -58,3 +65,50 @@ def model_status(
         if model_repo.config
         else None,
     )
+
+
+# Описания признаков для документации
+_FEATURE_DESCRIPTIONS = {
+    "monthly_fee": "Ежемесячная плата за сервис",
+    "usage_hours": "Часы использования сервиса",
+    "support_requests": "Количество обращений в поддержку",
+    "account_age_months": "Возраст аккаунта в месяцах",
+    "failed_payments": "Количество неудачных платежей",
+    "autopay_enabled": "Включён ли автоплатёж (0/1)",
+    "region": "Регион клиента (america, europe, asia, africa)",
+    "device_type": "Тип устройства (mobile, desktop, tablet)",
+    "payment_method": "Метод оплаты (card, paypal, crypto)",
+}
+
+
+@router.get("/schema")
+def model_schema() -> ModelSchemaResponse:
+    """
+    Возвращает схему признаков модели.
+
+    Полезно для клиентов, чтобы понять, какие признаки ожидает модель
+    и какие типы данных нужно передавать в /predict.
+    """
+    features = []
+
+    # Числовые признаки
+    for col in NUMERIC_COLUMNS:
+        features.append(
+            FeatureInfo(
+                name=col,
+                type="numeric",
+                description=_FEATURE_DESCRIPTIONS.get(col, ""),
+            )
+        )
+
+    # Категориальные признаки
+    for col in CATEGORICAL_COLUMNS:
+        features.append(
+            FeatureInfo(
+                name=col,
+                type="categorical",
+                description=_FEATURE_DESCRIPTIONS.get(col, ""),
+            )
+        )
+
+    return ModelSchemaResponse(features=features)
