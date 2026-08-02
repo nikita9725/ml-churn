@@ -1,4 +1,4 @@
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
@@ -83,20 +83,6 @@ def test_model_train_endpoint_empty_dataset(
     data = response.json()
     assert data["code"] == ErrorCode.EMPTY_DATASET.value
     assert "empty" in data["message"].lower()
-
-
-@pytest.fixture
-def model_path(tmp_path: Path) -> Path:
-    return tmp_path / "churn_model.joblib"
-
-
-@pytest.fixture
-def override_model_repo() -> Generator[Callable[[ModelRepository | object], None]]:
-    def _override(repo: ModelRepository | object) -> None:
-        app.dependency_overrides[get_loaded_model_repo] = lambda: repo
-
-    yield _override
-    app.dependency_overrides.clear()
 
 
 def test_save_and_load_model(sample_df: pd.DataFrame, model_path: Path) -> None:
