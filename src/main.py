@@ -1,7 +1,6 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +9,7 @@ from fastapi.responses import JSONResponse
 from src.api.routes.dataset import router as dataset_router
 from src.api.routes.model import router as model_router
 from src.api.routes.predict import router as predict_router
+from src.config import DATASET_PATH, HISTORY_PATH, MODEL_PATH
 from src.exceptions import (
     ChurnServiceError,
     ErrorCode,
@@ -26,26 +26,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-_dataset_path = Path(__file__).resolve().parent.parent / "data" / "churn_dataset.csv"
-_model_path = Path(__file__).resolve().parent.parent / "models" / "churn_model.joblib"
-_history_path = (
-    Path(__file__).resolve().parent.parent / "models" / "training_history.json"
-)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    logger.info("Loading model from %s", _model_path)
-    repo = ModelRepository(_model_path)
+    logger.info("Loading model from %s", MODEL_PATH)
+    repo = ModelRepository(MODEL_PATH)
     repo.load()
     app.state.model_repo = repo
     if repo.is_trained:
         logger.info("Model loaded successfully (trained at %s)", repo.trained_at)
     else:
-        logger.warning("No trained model found at %s", _model_path)
+        logger.warning("No trained model found at %s", MODEL_PATH)
 
-    logger.info("Loading training history from %s", _history_path)
-    history_repo = JsonTrainingHistoryRepository(_history_path)
+    logger.info("Loading training history from %s", HISTORY_PATH)
+    history_repo = JsonTrainingHistoryRepository(HISTORY_PATH)
     history_repo.load()
     app.state.training_history_repo = history_repo
     logger.info("Training history loaded (%d entries)", len(history_repo.get_all()))
@@ -136,5 +130,5 @@ def health_check(request: Request) -> HealthCheckResponse:
     return HealthCheckResponse(
         status="ok",
         model_available=model_repo.is_trained,
-        dataset_loaded=_dataset_path.exists(),
+        dataset_loaded=DATASET_PATH.exists(),
     )

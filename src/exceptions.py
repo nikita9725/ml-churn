@@ -12,9 +12,6 @@ class ErrorCode(StrEnum):
     PREDICTION_FAILED = "PREDICTION_FAILED"
     VALIDATION_ERROR = "VALIDATION_ERROR"
     HTTP_ERROR = "HTTP_ERROR"
-    INVALID_CONFIG = "INVALID_CONFIG"
-    DATASET_NOT_FOUND = "DATASET_NOT_FOUND"
-    MODEL_LOAD_FAILED = "MODEL_LOAD_FAILED"
 
 
 class ErrorDetails(BaseModel):
@@ -83,38 +80,5 @@ class PredictionFailedError(ChurnServiceError):
         super().__init__(
             ErrorCode.PREDICTION_FAILED,
             "Prediction failed",
-            ErrorDetails(error=error),
-        )
-
-
-class InvalidConfigError(ChurnServiceError):
-    """Неверная конфигурация."""
-
-    def __init__(self, error: str) -> None:
-        super().__init__(
-            ErrorCode.INVALID_CONFIG,
-            "Invalid configuration",
-            ErrorDetails(error=error),
-        )
-
-
-class DatasetNotFoundError(ChurnServiceError):
-    """Датасет не найден."""
-
-    def __init__(self, path: str) -> None:
-        super().__init__(
-            ErrorCode.DATASET_NOT_FOUND,
-            "Dataset file not found",
-            ErrorDetails(error=f"Path: {path}"),
-        )
-
-
-class ModelLoadFailedError(ChurnServiceError):
-    """Ошибка при загрузке модели."""
-
-    def __init__(self, error: str) -> None:
-        super().__init__(
-            ErrorCode.MODEL_LOAD_FAILED,
-            "Failed to load model",
             ErrorDetails(error=error),
         )
