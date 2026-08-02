@@ -268,6 +268,7 @@ curl http://127.0.0.1:8000/model/schema
 | Метод | Путь | Описание |
 |-------|------|----------|
 | GET | `/` | Проверка работоспособности |
+| GET | `/health` | Состояние сервиса (модель, датасет) |
 | GET | `/docs` | Swagger UI документация |
 
 ## 🛠 Стек
@@ -303,6 +304,18 @@ make run
 
 Сервис будет доступен на `http://127.0.0.1:8000`.
 
+## 📋 Логирование
+
+Сервис логирует ключевые события в stdout:
+
+- **Загрузка модели** при старте (путь, статус, время обучения)
+- **Загрузка датасета** (путь, количество строк и колонок)
+- **Обучение модели** (тип модели, количество строк, метрики)
+- **Запросы предсказаний** (количество клиентов)
+- **Ошибки** (service errors, HTTP errors, validation errors)
+
+Формат логов: `%(asctime)s [%(levelname)s] %(name)s: %(message)s`
+
 ## 🐳 Docker
 
 ```bash
@@ -330,7 +343,9 @@ make docker-build && make docker-up
 ```
 src/
 ├── main.py                    # FastAPI приложение, lifespan, exception handler
+├── config.py                  # Централизованные пути (DATASET_PATH, MODEL_PATH, HISTORY_PATH)
 ├── schemas.py                 # Pydantic модели (схемы)
+├── exceptions.py              # Кастомные исключения и коды ошибок
 ├── api/
 │   ├── dependencies.py        # Dependency injection (get_dataset_repo, get_loaded_model_repo, get_training_history_repo)
 │   └── routes/
