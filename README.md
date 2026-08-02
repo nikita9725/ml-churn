@@ -9,7 +9,7 @@ ML-сервис для прогнозирования оттока клиент�
 | | |
 |---|---|
 | **Тип задачи** | Бинарная классификация |
-| **Модель** | Logistic Regression |
+| **Модели** | Logistic Regression, Random Forest (настраивается) |
 | **Целевая переменная** | `churn` (0 — остался, 1 — ушёл) |
 | **Датасет** | 2000 записей, 9 признаков |
 
@@ -20,13 +20,25 @@ ML-сервис для прогнозирования оттока клиент�
 │                      ML Pipeline                             │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  Данные ──→ ColumnTransformer ──→ LogisticRegression ──→ churn │
+│  Данные ──→ ColumnTransformer ──→ Модель ──→ churn          │
+│                  │                    │                      │
+│                  │                    ├── LogisticRegression │
+│                  │                    └── RandomForest       │
 │                  │                                          │
 │                  ├── StandardScaler (числовые)              │
 │                  └── OneHotEncoder (категориальные)         │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Поддерживаемые модели
+
+| Модель | Описание | Когда использовать |
+|--------|----------|-------------------|
+| `logreg` | Logistic Regression | Базовая модель, быстрая, интерпретируемая |
+| `random_forest` | Random Forest | Лучше работает со сложными зависимостями |
+
+> **Результаты сравнения:** Random Forest показывает F1=0.175 против F1=0.045 у Logistic Regression (в 4 раза лучше для churn prediction).
 
 ### Признаки
 
@@ -60,7 +72,7 @@ ML-сервис для прогнозирования оттока клиент�
 
 ## 🚀 Быстрый старт
 
-### Обучение модели
+### Обучение модели с дефолтным конфигом (LogisticRegression)
 
 ```bash
 curl -X POST http://127.0.0.1:8000/model/train
@@ -74,12 +86,79 @@ curl -X POST http://127.0.0.1:8000/model/train
 }
 ```
 
+### Обучение с Random Forest и гиперпараметрами
+
+```bash
+curl -X POST http://127.0.0.1:8000/model/train \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model_type": "random_forest",
+    "hyperparameters": {"n_estimators": 100}
+  }'
+```
+
+**Ответ:**
+```json
+{
+  "accuracy": 0.79,
+  "f1": 0.17
+}
+```
+
+### Проверка статуса модели
+
+```bash
+curl http://127.0.0.1:8000/model/status
+```
+
+**Ответ:**
+```json
+{
+  "is_trained": true,
+  "trained_at": "2026-08-02T07:59:52.699997Z",
+  "accuracy": 0.79,
+  "f1": 0.17,
+  "model_type": "random_forest",
+  "hyperparameters": {"n_estimators": 100}
+}
+```
+
+### Предсказание для нового клиента
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "monthly_fee": 49.99,
+    "usage_hours": 5.0,
+    "support_requests": 8,
+    "account_age_months": 2,
+    "failed_payments": 5,
+    "region": "africa",
+    "device_type": "mobile",
+    "payment_method": "crypto",
+    "autopay_enabled": 0
+  }'
+```
+
+**Ответ:**
+```json
+{
+  "prediction": 1,
+  "probability_churn_0": 0.48,
+  "probability_churn_1": 0.52,
+  "features": {...}
+}
+```
+
 ### Как это работает
 
 1. Загружаются данные из `data/churn_dataset.csv`
 2. Данные разделяются на train (80%) и test (20%) с стратификацией
 3. Pipeline обучается на train: предобработка → модель
 4. Метрики вычисляются на test (честная оценка)
+5. Модель сохраняется в `models/churn_model.joblib` вместе с конфигом
+6. При перезапуске сервиса модель автоматически загружается
 
 ## 📡 API Endpoints
 
@@ -87,7 +166,14 @@ curl -X POST http://127.0.0.1:8000/model/train
 
 | Метод | Путь | Описание |
 |-------|------|----------|
-| POST | `/model/train` | Обучение модели, возврат метрик |
+| POST | `/model/train` | Обучение модели с конфигурацией |
+| GET | `/model/status` | Статус модели (тип, метрики, гиперпараметры) |
+
+### Предсказания
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| POST | `/predict` | Предсказание для одного клиента или списка |
 
 ### Датасет
 
@@ -102,6 +188,7 @@ curl -X POST http://127.0.0.1:8000/model/train
 | Метод | Путь | Описание |
 |-------|------|----------|
 | GET | `/` | Проверка работоспособности |
+| GET | `/docs` | Swagger UI документация |
 
 ## 🛠 Стек
 
@@ -162,14 +249,32 @@ make docker-build && make docker-up
 
 ```
 src/
-├── main.py                 # FastAPI приложение и эндпоинты
+├── main.py                    # FastAPI приложение, lifespan, exception handler
+├── schemas.py                 # Pydantic модели (схемы)
+├── api/
+│   ├── dependencies.py        # Dependency injection (get_dataset_repo, get_loaded_model_repo)
+│   └── routes/
+│       ├── dataset.py         # Эндпоинты для работы с датасетом
+│       ├── model.py           # Эндпоинты для обучения и статуса модели
+│       └── predict.py         # Эндпоинт для предсказаний
 ├── dataset/
-│   ├── preprocessing.py    # Предобработка данных, train/test split
-│   └── repository.py       # Загрузка и хранение датасета
+│   ├── preprocessing.py       # Предобработка данных, train/test split
+│   └── repository.py          # Загрузка и хранение датасета
 └── model/
-    └── training.py         # ML pipeline, обучение модели
+    ├── training.py            # ML pipeline, обучение модели
+    └── repository.py          # Сохранение и загрузка модели
 
-tests/                      # Тесты (29 тестов)
+tests/
+├── conftest.py                # Общие fixtures
+├── test_schemas.py            # Тесты Pydantic моделей
+├── test_main.py               # Тесты root endpoint
+├── test_dataset.py            # Тесты dataset (unit + API)
+├── test_model.py              # Тесты model (unit + API)
+└── test_predict.py            # Тесты predict (API)
+
+models/                        # Сохранённые модели (gitignored)
+└── churn_model.joblib         # Обученная модель с конфигом
+
 data/
-└── churn_dataset.csv       # Датасет (2000 записей)
+└── churn_dataset.csv          # Датасет (2000 записей)
 ```
