@@ -6,12 +6,9 @@ from pathlib import Path
 import joblib
 from sklearn.pipeline import Pipeline
 
+from src.exceptions import ModelNotTrainedError
 from src.model.training import ModelMetrics
 from src.schemas import TrainingConfigChurn
-
-
-class ModelNotTrainedError(Exception):
-    """Raised when trying to access a model that has not been trained yet."""
 
 
 class ModelRepository:
@@ -53,7 +50,7 @@ class ModelRepository:
     @property
     def pipeline(self) -> Pipeline:
         if self._pipeline is None:
-            raise ModelNotTrainedError("Model has not been trained yet")
+            raise ModelNotTrainedError()
         return self._pipeline
 
     @property

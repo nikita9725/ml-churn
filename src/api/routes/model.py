@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends
 
 from src.api.dependencies import get_dataset_repo, get_loaded_model_repo
 from src.dataset.preprocessing import CATEGORICAL_COLUMNS, NUMERIC_COLUMNS
 from src.dataset.repository import DatasetRepository
+from src.exceptions import EmptyDatasetError, TrainingFailedError
 from src.model.repository import ModelRepository
 from src.model.training import train_churn_model
 from src.schemas import (
@@ -35,15 +36,13 @@ def model_train(
     df = repo.df
 
     if df.empty:
-        raise HTTPException(status_code=400, detail="Dataset is empty")
+        raise EmptyDatasetError()
 
     try:
         pipeline, metrics, config = train_churn_model(df, config)
         model_repo.save(pipeline, metrics, config)
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Model training failed: {e!s}"
-        ) from e
+        raise TrainingFailedError(str(e)) from e
 
     return ModelMetricsResponse(
         accuracy=metrics.accuracy,

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 
 from src.api.dependencies import get_loaded_model_repo
 from src.dataset.preprocessing import CATEGORICAL_COLUMNS, NUMERIC_COLUMNS
+from src.exceptions import PredictionFailedError
 from src.model.repository import ModelRepository
 from src.schemas import FeatureVectorChurn, PredictionResponseChurn
 
@@ -65,8 +66,11 @@ def predict(
         [f.model_dump() for f in features_list], columns=ALL_FEATURE_COLUMNS
     )
 
-    predictions = pipeline.predict(df)
-    probabilities = pipeline.predict_proba(df)
+    try:
+        predictions = pipeline.predict(df)
+        probabilities = pipeline.predict_proba(df)
+    except Exception as e:
+        raise PredictionFailedError(str(e)) from e
 
     results = [
         PredictionResponseChurn(

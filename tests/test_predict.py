@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from src.dataset.repository import DatasetRepository
+from src.exceptions import ErrorCode
 from src.model.repository import ModelRepository
 
 REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
@@ -24,7 +25,9 @@ SAMPLE_FEATURES = {
 def test_predict_returns_400_when_model_not_trained(client: TestClient) -> None:
     response = client.post("/predict", json=SAMPLE_FEATURES)
     assert response.status_code == 400
-    assert "Model has not been trained yet" in response.json()["detail"]
+    data = response.json()
+    assert data["code"] == ErrorCode.MODEL_NOT_TRAINED.value
+    assert data["message"] == "Model has not been trained yet"
 
 
 def test_predict_validates_types(client: TestClient) -> None:

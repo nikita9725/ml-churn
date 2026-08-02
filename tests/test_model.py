@@ -8,8 +8,9 @@ from fastapi.testclient import TestClient
 
 from src.api.dependencies import get_loaded_model_repo
 from src.dataset.repository import DatasetRepository
+from src.exceptions import ErrorCode, ModelNotTrainedError
 from src.main import app
-from src.model.repository import ModelNotTrainedError, ModelRepository
+from src.model.repository import ModelRepository
 from src.model.training import ModelMetrics, train_churn_model
 
 REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
@@ -76,7 +77,9 @@ def test_model_train_endpoint_empty_dataset(
     override_model_repo(ModelRepository(model_path))
     response = client.post("/model/train")
     assert response.status_code == 400
-    assert "empty" in response.json()["detail"].lower()
+    data = response.json()
+    assert data["code"] == ErrorCode.EMPTY_DATASET.value
+    assert "empty" in data["message"].lower()
 
 
 @pytest.fixture
@@ -177,7 +180,7 @@ def test_model_persists_after_restart(
 
 def test_pipeline_raises_model_not_trained_error(model_path: Path) -> None:
     repo = ModelRepository(model_path)
-    with pytest.raises(ModelNotTrainedError, match="Model has not been trained yet"):
+    with pytest.raises(ModelNotTrainedError):
         _ = repo.pipeline
 
 
@@ -189,7 +192,7 @@ def test_model_not_trained_error_returns_400(
     class RepoWithUntrainedPipeline:
         @property
         def pipeline(self) -> None:
-            raise ModelNotTrainedError("Model has not been trained yet")
+            raise ModelNotTrainedError()
 
     override_model_repo(RepoWithUntrainedPipeline())
 
@@ -203,7 +206,9 @@ def test_model_not_trained_error_returns_400(
     try:
         response = client.get("/test-pipeline")
         assert response.status_code == 400
-        assert "Model has not been trained yet" in response.json()["detail"]
+        data = response.json()
+        assert data["code"] == ErrorCode.MODEL_NOT_TRAINED.value
+        assert data["message"] == "Model has not been trained yet"
     finally:
         app.router.routes = [
             r for r in app.router.routes if getattr(r, "path", None) != "/test-pipeline"
