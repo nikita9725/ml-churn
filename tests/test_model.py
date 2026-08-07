@@ -12,6 +12,7 @@ from src.exceptions import ErrorCode, ModelNotTrainedError
 from src.main import app
 from src.model.repository import ModelRepository
 from src.model.training import ModelMetrics, train_churn_model
+from src.schemas import TrainingConfigChurn
 
 REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
 
@@ -218,8 +219,6 @@ def test_model_not_trained_error_returns_400(
 def test_train_with_logreg_config(
     sample_df: pd.DataFrame,
 ) -> None:
-    from src.schemas import TrainingConfigChurn
-
     config = TrainingConfigChurn(model_type="logreg", hyperparameters={"C": 0.5})
     pipeline, _metrics, returned_config = train_churn_model(sample_df, config)
     assert pipeline is not None
@@ -230,8 +229,6 @@ def test_train_with_logreg_config(
 def test_train_with_random_forest_config(
     sample_df: pd.DataFrame,
 ) -> None:
-    from src.schemas import TrainingConfigChurn
-
     config = TrainingConfigChurn(
         model_type="random_forest", hyperparameters={"n_estimators": 50}
     )
@@ -244,8 +241,6 @@ def test_train_with_random_forest_config(
 def test_train_with_invalid_model_type(
     sample_df: pd.DataFrame,
 ) -> None:
-    from src.schemas import TrainingConfigChurn
-
     with pytest.raises(ValueError, match="Invalid model_type"):
         TrainingConfigChurn(model_type="invalid_model")
 
