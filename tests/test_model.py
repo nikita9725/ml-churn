@@ -7,6 +7,7 @@ from fastapi import Depends
 from fastapi.testclient import TestClient
 
 from src.api.dependencies import get_loaded_model_repo
+from src.dataset.preprocessing import prepare_data, split_data
 from src.dataset.repository import DatasetRepository
 from src.exceptions import ErrorCode, ModelNotTrainedError
 from src.main import app
@@ -53,6 +54,117 @@ def test_pipeline_rejects_unknown_category(sample_df: pd.DataFrame) -> None:
     X_unknown["region"] = "mars"
     with pytest.raises(ValueError, match="unknown"):
         pipeline.predict(X_unknown)
+
+
+def test_pipeline_handles_missing_values(sample_df: pd.DataFrame) -> None:
+    pipeline, _, _ = train_churn_model(sample_df)
+    X_with_na = sample_df.drop(columns=["churn"]).head(2).copy()
+    X_with_na.loc[0, "monthly_fee"] = None
+    X_with_na.loc[1, "region"] = None
+    predictions = pipeline.predict(X_with_na)
+    assert len(predictions) == 2
+    assert all(p in [0, 1] for p in predictions)
+
+
+def test_imputer_uses_only_train_statistics() -> None:
+    """
+    Тест доказывает отсутствие утечки данных из test в train при импутации.
+
+    Создаём датасет, где train и test имеют сильно разные распределения:
+    - train monthly_fee: [10, 20, NaN, 40, 50, 60, 70, 80] → median = 50
+    - test monthly_fee: [1000, 2000]
+
+    Если бы импутация происходила на всём датасете (утечка):
+    - overall median = median([10,20,40,50,60,70,80,1000,2000]) = 60
+
+    При корректной импутации только на train:
+    - train median = median([10,20,40,50,60,70,80]) = 50
+
+    Проверяем, что SimpleImputer запомнил именно train median (50), а не overall (60).
+    """
+
+    df = pd.DataFrame(
+        {
+            "monthly_fee": [
+                10.0,
+                20.0,
+                None,
+                40.0,
+                50.0,
+                60.0,
+                70.0,
+                80.0,
+                1000.0,
+                2000.0,
+            ],
+            "usage_hours": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+            "support_requests": [0, 1, 2, 3, 0, 1, 2, 3, 0, 1],
+            "account_age_months": [12, 24, 36, 48, 12, 24, 36, 48, 12, 24],
+            "failed_payments": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+            "region": [
+                "america",
+                "europe",
+                "asia",
+                "america",
+                "europe",
+                "asia",
+                "america",
+                "europe",
+                "asia",
+                "america",
+            ],
+            "device_type": [
+                "mobile",
+                "desktop",
+                "tablet",
+                "mobile",
+                "desktop",
+                "tablet",
+                "mobile",
+                "desktop",
+                "tablet",
+                "mobile",
+            ],
+            "payment_method": [
+                "card",
+                "paypal",
+                "crypto",
+                "card",
+                "paypal",
+                "crypto",
+                "card",
+                "paypal",
+                "crypto",
+                "card",
+            ],
+            "autopay_enabled": [1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            "churn": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+        }
+    )
+
+    prepared = prepare_data(df)
+    split = split_data(prepared, test_size=0.2, random_state=42)
+
+    pipeline, _, _ = train_churn_model(df)
+
+    # Получаем SimpleImputer из pipeline
+    preprocessor = pipeline.named_steps["preprocessor"]
+    numeric_pipeline = preprocessor.named_transformers_["num"]
+    imputer = numeric_pipeline.named_steps["imputer"]
+
+    # Проверяем, что imputer запомнил median из train (50.0), а не из всего датасета (60.0)
+    # monthly_fee — первый числовой признак (индекс 0)
+    monthly_fee_idx = list(preprocessor.transformers_[0][2]).index("monthly_fee")
+    train_median = split.X_train["monthly_fee"].median()
+    imputer_value = imputer.statistics_[monthly_fee_idx]
+
+    assert imputer_value == train_median, (
+        f"Imputer uses wrong statistic: got {imputer_value}, expected train median {train_median}. "
+        f"This indicates data leakage from test to train."
+    )
+    assert imputer_value == 50.0, (
+        f"Expected train median to be 50.0, got {imputer_value}"
+    )
 
 
 def test_model_train_endpoint(

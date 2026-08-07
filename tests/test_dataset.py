@@ -169,19 +169,6 @@ def test_prepare_data_separates_x_and_y(sample_df: pd.DataFrame) -> None:
     assert len(y) == 10
 
 
-def test_prepare_data_fills_numeric_na(sample_df: pd.DataFrame) -> None:
-    X, _ = prepare_data(sample_df)
-    assert X["monthly_fee"].isnull().sum() == 0
-    assert X["usage_hours"].isnull().sum() == 0
-
-
-def test_prepare_data_fills_categorical_na(sample_df: pd.DataFrame) -> None:
-    X, _ = prepare_data(sample_df)
-    assert X["region"].isnull().sum() == 0
-    assert X["device_type"].isnull().sum() == 0
-    assert X["payment_method"].isnull().sum() == 0
-
-
 def test_prepare_data_does_not_modify_original(sample_df: pd.DataFrame) -> None:
     original_na = sample_df["monthly_fee"].isnull().sum()
     prepare_data(sample_df)

@@ -5,6 +5,7 @@ from typing import Any
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.pipeline import Pipeline
@@ -41,18 +42,32 @@ def _build_preprocessor() -> ColumnTransformer:
     Создаём ColumnTransformer — он применяет разные трансформации к разным колонкам.
 
     Для числовых признаков (NUMERIC_COLUMNS):
+    - SimpleImputer(strategy="median") заполняет пропуски медианой.
+      Обучается только на train, что предотвращает утечку данных из test.
     - StandardScaler приводит признаки к одному масштабу (среднее=0, стандартное отклонение=1).
       Это важно для LogisticRegression, потому что градиентный спуск работает лучше,
       когда все признаки в одном масштабе.
 
     Для категориальных признаков (CATEGORICAL_COLUMNS):
+    - SimpleImputer(strategy="most_frequent") заполняет пропуски модой.
+      Обучается только на train, что предотвращает утечку данных из test.
     - OneHotEncoder преобразует категории в бинарные колонки (0/1).
       Например, region="america" станет [1, 0, 0], region="europe" → [0, 1, 0].
       set_output(transform="pandas") возвращает DataFrame с понятными именами колонок.
     """
-    numeric_transformer = StandardScaler()
+    numeric_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
 
-    categorical_transformer = OneHotEncoder(handle_unknown="error", sparse_output=False)
+    categorical_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OneHotEncoder(handle_unknown="error", sparse_output=False)),
+        ]
+    )
 
     preprocessor = ColumnTransformer(
         transformers=[
@@ -119,10 +134,10 @@ def train_churn_model(
         tuple[Pipeline, ModelMetrics, TrainingConfigChurn]: обученный pipeline, метрики и конфиг
 
     Как это работает:
-    1. prepare_data — заполняет пропуски, разделяет X (признаки) и y (целевая переменная)
+    1. prepare_data — разделяет X (признаки) и y (целевая переменная)
     2. split_data — разделяет данные на тренировочную и тестовую выборки (80/20)
        Стратификация гарантирует, что пропорция классов (churn/no churn) одинакова в обеих выборках
-    3. Pipeline обучается на тренировочных данных
+    3. Pipeline обучается на тренировочных данных (включая импутацию пропусков внутри Pipeline)
     4. Метрики вычисляются на тестовых данных — это честная оценка,
        потому что модель не видела эти данные во время обучения
     """

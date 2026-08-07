@@ -13,7 +13,7 @@ from src.model.history_repository import (
     JsonTrainingHistoryRepository,
 )
 from src.model.repository import ModelRepository
-from src.model.training import TrainingHistoryEntry
+from src.model.training import TrainingHistoryEntry, train_churn_model
 
 REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
 
@@ -377,8 +377,6 @@ def test_status_includes_roc_auc(
 
 
 def test_train_churn_model_returns_roc_auc() -> None:
-    from src.model.training import train_churn_model
-
     df = pd.read_csv(REAL_DATA_PATH)
     _, metrics, _ = train_churn_model(df)
     assert 0.0 <= metrics.roc_auc <= 1.0
