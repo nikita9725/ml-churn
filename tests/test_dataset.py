@@ -1,3 +1,4 @@
+import tempfile
 from collections.abc import Callable, Generator
 from pathlib import Path
 
@@ -13,6 +14,11 @@ from src.dataset.preprocessing import (
     split_data,
 )
 from src.dataset.repository import DatasetRepository
+from src.exceptions import (
+    DatasetEmptyFileError,
+    DatasetInvalidStructureError,
+    DatasetNotFoundError,
+)
 from src.main import app
 
 REAL_DATA_PATH = Path(__file__).parent.parent / "data" / "churn_dataset.csv"
@@ -73,8 +79,31 @@ def test_get_info_feature_names_exclude_churn(repo: DatasetRepository) -> None:
 
 
 def test_missing_file_raises() -> None:
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(DatasetNotFoundError):
         DatasetRepository(Path("/nonexistent/file.csv"))
+
+
+def test_empty_file_raises() -> None:
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+        empty_file = Path(f.name)
+
+    try:
+        with pytest.raises(DatasetEmptyFileError):
+            DatasetRepository(empty_file)
+    finally:
+        empty_file.unlink()
+
+
+def test_invalid_structure_raises() -> None:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
+        f.write("col1,col2\n1,2\n")
+        invalid_file = Path(f.name)
+
+    try:
+        with pytest.raises(DatasetInvalidStructureError):
+            DatasetRepository(invalid_file)
+    finally:
+        invalid_file.unlink()
 
 
 def test_dataset_preview_endpoint(
