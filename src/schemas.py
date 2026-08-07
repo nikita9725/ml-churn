@@ -1,7 +1,37 @@
 from datetime import datetime
+from enum import IntEnum, StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
+
+
+class Region(StrEnum):
+    EUROPE = "europe"
+    ASIA = "asia"
+    AMERICA = "america"
+    AFRICA = "africa"
+
+
+class DeviceType(StrEnum):
+    MOBILE = "mobile"
+    DESKTOP = "desktop"
+    TABLET = "tablet"
+
+
+class PaymentMethod(StrEnum):
+    CARD = "card"
+    PAYPAL = "paypal"
+    CRYPTO = "crypto"
+
+
+class AutopayEnabled(IntEnum):
+    NO = 0
+    YES = 1
+
+
+class ChurnLabel(IntEnum):
+    NO = 0
+    YES = 1
 
 
 class FeatureVectorChurn(BaseModel):
@@ -10,14 +40,14 @@ class FeatureVectorChurn(BaseModel):
     support_requests: int
     account_age_months: int
     failed_payments: int
-    region: str
-    device_type: str
-    payment_method: str
-    autopay_enabled: int
+    region: Region
+    device_type: DeviceType
+    payment_method: PaymentMethod
+    autopay_enabled: AutopayEnabled
 
 
 class DatasetRowChurn(FeatureVectorChurn):
-    churn: int
+    churn: ChurnLabel
 
 
 class HealthResponse(BaseModel):

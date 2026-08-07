@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.dataset.repository import DatasetRepository
@@ -15,9 +16,9 @@ SAMPLE_FEATURES = {
     "support_requests": 3,
     "account_age_months": 24,
     "failed_payments": 1,
-    "region": "EU",
+    "region": "europe",
     "device_type": "mobile",
-    "payment_method": "credit_card",
+    "payment_method": "card",
     "autopay_enabled": 1,
 }
 
@@ -40,6 +41,26 @@ def test_predict_rejects_missing_field(client: TestClient) -> None:
     payload = {k: v for k, v in SAMPLE_FEATURES.items() if k != "region"}
     response = client.post("/predict", json=payload)
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "field, invalid_value",
+    [
+        ("region", "mars"),
+        ("device_type", "watch"),
+        ("payment_method", "credit_card"),
+        ("autopay_enabled", 2),
+    ],
+)
+def test_predict_rejects_invalid_domain_values(
+    client: TestClient, field: str, invalid_value: object
+) -> None:
+    payload = {**SAMPLE_FEATURES, field: invalid_value}
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 422
+    data = response.json()
+    assert data["code"] == ErrorCode.VALIDATION_ERROR.value
+    assert field in data["details"]["error"]
 
 
 def test_predict_single(

@@ -46,6 +46,14 @@ def test_train_churn_model_pipeline_can_predict(sample_df: pd.DataFrame) -> None
     assert all(p in [0, 1] for p in predictions)
 
 
+def test_pipeline_rejects_unknown_category(sample_df: pd.DataFrame) -> None:
+    pipeline, _, _ = train_churn_model(sample_df)
+    X_unknown = sample_df.drop(columns=["churn"]).head(1).copy()
+    X_unknown["region"] = "mars"
+    with pytest.raises(ValueError, match="unknown"):
+        pipeline.predict(X_unknown)
+
+
 def test_model_train_endpoint(
     client: TestClient,
     override_repo: Callable[[DatasetRepository | object], None],

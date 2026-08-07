@@ -52,9 +52,7 @@ def _build_preprocessor() -> ColumnTransformer:
     """
     numeric_transformer = StandardScaler()
 
-    categorical_transformer = OneHotEncoder(
-        handle_unknown="ignore", sparse_output=False
-    )
+    categorical_transformer = OneHotEncoder(handle_unknown="error", sparse_output=False)
 
     preprocessor = ColumnTransformer(
         transformers=[

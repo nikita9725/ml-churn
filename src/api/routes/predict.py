@@ -42,7 +42,7 @@ def predict(
         "failed_payments": 2,
         "region": "europe",
         "device_type": "mobile",
-        "payment_method": "credit_card",
+        "payment_method": "card",
         "autopay_enabled": 0
     }
     ```
