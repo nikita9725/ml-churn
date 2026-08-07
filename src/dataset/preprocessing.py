@@ -44,17 +44,6 @@ CATEGORICAL_COLUMNS = [
 def prepare_data(df: pd.DataFrame) -> PreparedData:
     df = df.copy()
 
-    numeric_cols = [c for c in NUMERIC_COLUMNS if c in df.columns]
-    categorical_cols = [c for c in CATEGORICAL_COLUMNS if c in df.columns]
-
-    for col in numeric_cols:
-        if df[col].isnull().any():
-            df[col] = df[col].fillna(df[col].median())
-
-    for col in categorical_cols:
-        if df[col].isnull().any():
-            df[col] = df[col].fillna(df[col].mode()[0])
-
     X = df.drop(columns=[TARGET_COLUMN])
     y = df[TARGET_COLUMN]
 

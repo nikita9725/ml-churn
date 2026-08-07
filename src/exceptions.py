@@ -7,6 +7,9 @@ class ErrorCode(StrEnum):
     """Коды ошибок сервиса."""
 
     EMPTY_DATASET = "EMPTY_DATASET"
+    DATASET_NOT_FOUND = "DATASET_NOT_FOUND"
+    DATASET_EMPTY_FILE = "DATASET_EMPTY_FILE"
+    DATASET_INVALID_STRUCTURE = "DATASET_INVALID_STRUCTURE"
     MODEL_NOT_TRAINED = "MODEL_NOT_TRAINED"
     TRAINING_FAILED = "TRAINING_FAILED"
     PREDICTION_FAILED = "PREDICTION_FAILED"
@@ -53,6 +56,42 @@ class EmptyDatasetError(ChurnServiceError):
 
     def __init__(self) -> None:
         super().__init__(ErrorCode.EMPTY_DATASET, "Dataset is empty")
+
+
+class DatasetNotFoundError(ChurnServiceError):
+    """Файл датасета не найден."""
+
+    def __init__(self, file_path: str) -> None:
+        super().__init__(
+            ErrorCode.DATASET_NOT_FOUND,
+            f"Dataset file not found: {file_path}",
+            ErrorDetails(expected="Existing file path", received=file_path),
+        )
+
+
+class DatasetEmptyFileError(ChurnServiceError):
+    """Файл датасета пустой."""
+
+    def __init__(self, file_path: str) -> None:
+        super().__init__(
+            ErrorCode.DATASET_EMPTY_FILE,
+            f"Dataset file is empty: {file_path}",
+            ErrorDetails(expected="Non-empty CSV file", received=file_path),
+        )
+
+
+class DatasetInvalidStructureError(ChurnServiceError):
+    """Датасет имеет неверную структуру (отсутствуют обязательные колонки)."""
+
+    def __init__(self, missing_columns: list[str]) -> None:
+        super().__init__(
+            ErrorCode.DATASET_INVALID_STRUCTURE,
+            f"Dataset is missing required columns: {', '.join(missing_columns)}",
+            ErrorDetails(
+                expected="Columns: churn, monthly_fee, usage_hours, support_requests, account_age_months, failed_payments, region, device_type, payment_method, autopay_enabled",
+                received=f"Missing: {', '.join(missing_columns)}",
+            ),
+        )
 
 
 class ModelNotTrainedError(ChurnServiceError):
